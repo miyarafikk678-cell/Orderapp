@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CheesyOrder — Admin & User Dashboard</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #FFD700, #FF4500);
+      color: #333;
+    }
+    header {
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.9);
+      border-bottom: 2px solid #ff4500;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: #FF4500;
+    }
+    header p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: #666;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      padding: 1rem;
+      margin: 1rem auto;
+      max-width: 800px;
+    }
+    nav {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    nav button {
+      background: linear-gradient(90deg, #FFD700, #FF4500);
+      border: none;
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      color: #fff;
+    }
+    nav button:hover {
+      opacity: 0.9;
+    }
+    input, select {
+      padding: 0.5rem;
+      margin: 0.3rem 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      width: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+    th, td {
+      padding: 0.5rem;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>CheesyOrder</h1>
+    <p>Admin & User dashboards — Supabase powered</p>
+  </header>
+
+  <main id="main" class="card">Loading...</main>
+
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+    // 🔑 Replace with your Supabase values
+    const SUPABASE_URL = "YOUR_SUPABASE_URL";
+    const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY";
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // --- Entry Point ---
+    renderRoleChoice();
+
+    function renderRoleChoice() {
+      document.getElementById("main").innerHTML = `
+        <h2>Select Role</h2>
+        <button id="btn-admin">Admin</button>
+        <button id="btn-user">User</button>
+      `;
+      document.getElementById("btn-admin").onclick = renderAdminLogin;
+      document.getElementById("btn-user").onclick = renderUserLogin;
+    }
+
+    // --- Admin Login ---
+    function renderAdminLogin() {
+      document.getElementById("main").innerHTML = `
+        <h2>Admin Login</h2>
+        <input type="text" id="admin-username" placeholder="Username">
+        <input type="password" id="admin-password" placeholder="Password">
+        <button id="btn-login">Login</button>
+        <button onclick="renderRoleChoice()">Back</button>
+      `;
+      document.getElementById("btn-login").onclick = () => {
+        const u = document.getElementById("admin-username").value;
+        const p = document.getElementById("admin-password").value;
+        if(u==="Cheesyorder" && p==="Chessy$2023"){
+          localStorage.setItem("cheesy_admin","true");
+          renderAdminDashboard();
+        } else {
+          alert("Invalid credentials");
+        }
+      };
+    }
+
+    // --- Admin Dashboard ---
+    function renderAdminDashboard() {
+      document.getElementById("main").innerHTML = `
+        <h2>Admin Dashboard</h2>
+        <nav>
+          <button id="nav-users">Create User</button>
+          <button id="nav-branches">Branches</button>
+          <button id="nav-items">Items</button>
+          <button id="nav-orders">See Orders</button>
+          <button id="nav-reports">Reports</button>
+          <button id="nav-logout">Logout</button>
+        </nav>
+        <div id="admin-main">Select an option above</div>
+      `;
+      document.getElementById("nav-logout").onclick = () => {
+        localStorage.removeItem("cheesy_admin");
+        renderRoleChoice();
+      };
+      // TODO: fill out handlers for users/branches/items/orders/reports
+    }
+
+    // --- User Login ---
+    function renderUserLogin() {
+      document.getElementById("main").innerHTML = `
+        <h2>User Login</h2>
+        <input type="text" id="user-username" placeholder="Username">
+        <input type="password" id="user-password" placeholder="Password">
+        <button id="btn-login">Login</button>
+        <button onclick="renderRoleChoice()">Back</button>
+      `;
+      document.getElementById("btn-login").onclick = async () => {
+        const u = document.getElementById("user-username").value;
+        const p = document.getElementById("user-password").value;
+        let { data, error } = await supabase.from("users")
+          .select("*").eq("username", u).eq("password", p).single();
+        if(data){
+          localStorage.setItem("cheesy_user", JSON.stringify(data));
+          renderUserDashboard();
+        } else {
+          alert("Invalid login");
+        }
+      };
+    }
+
+    // --- User Dashboard ---
+    async function renderUserDashboard() {
+      const stored = JSON.parse(localStorage.getItem("cheesy_user")||"null");
+      if(!stored){ renderUserLogin(); return; }
+
+      const { data: branch } = await supabase.from("branches")
+        .select("*").eq("id", stored.branch_id).single();
+
+      document.getElementById("main").innerHTML = `
+        <h2>User Dashboard</h2>
+        <p>Welcome <b>${stored.username}</b> | Branch: ${branch?branch.name:"-"}</p>
+        <nav>
+          <button id="nav-create">Create Order</button>
+          <button id="nav-past">Past Orders</button>
+          <button id="nav-received">Received Orders</button>
+          <button id="nav-logout">Logout</button>
+        </nav>
+        <div id="user-main">Select an option above</div>
+      `;
+      document.getElementById("nav-logout").onclick = () => {
+        localStorage.removeItem("cheesy_user");
+        renderRoleChoice();
+      };
+      // TODO: fill out handlers for create/past/received orders
+    }
+  </script>
+</body>
+</html>
